@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Proxy Central Manager</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #121212;
+            color: #e0e0e0;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 600px;
+            margin: 40px auto;
+            background: #1e1e1e;
+            padding: 25px;
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+        }
+        h2 {
+            margin-top: 0;
+            color: #00adb5;
+            border-bottom: 1px solid #333;
+            padding-bottom: 10px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input[type="text"], input[type="password"], input[type="datetime-local"], textarea {
+            width: 100%;
+            padding: 10px;
+            background: #2d2d2d;
+            border: 1px solid #444;
+            color: #fff;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        button {
+            background: #00adb5;
+            color: #fff;
+            border: none;
+            padding: 11px 20px;
+            cursor: pointer;
+            border-radius: 4px;
+            font-weight: bold;
+            width: 100%;
+        }
+        button:hover {
+            background: #008c9e;
+        }
+        .hidden {
+            display: none;
+        }
+        .alert {
+            padding: 10px;
+            margin-bottom: 15px;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+        .success { background: #1b5e20; color: #c8e6c9; }
+        .error { background: #b71c1c; color: #ffcdd2; }
+        .nav-links {
+            margin-bottom: 20px;
+            text-align: right;
+        }
+        .nav-links a {
+            color: #00adb5;
+            text-decoration: none;
+            margin-left: 15px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- LOGIN SCREEN -->
+    <div id="login-view" class="container">
+        <h2>System Login</h2>
+        <div id="login-msg"></div>
+        <form id="login-form">
+            <div class="form-group">
+                <label>Username</label>
+                <input type="text" id="username" required autocomplete="off">
+            </div>
+            <div class="form-group">
+                <label>Password</label>
+                <input type="password" id="password" required>
+            </div>
+            <button type="submit">Log In</button>
+        </form>
+    </div>
+
+    <!-- MAIN DASHBOARD (DROPPER VIEW) -->
+    <div id="dashboard-view" class="container hidden">
+        <div class="nav-links">
+            <span id="user-badge" style="float: left; font-weight: bold;"></span>
+            <a id="admin-link" class="hidden" onclick="showView('admin-view')">Admin Config</a>
+            <a onclick="logout()">Logout</a>
+        </div>
+        
+        <h2>Drop & Schedule Proxies</h2>
+        <div id="drop-msg"></div>
+        
+        <form id="drop-form" enctype="multipart/form-data">
+            <input type="hidden" id="user-id-holder">
+            
+            <div class="form-group">
+                <label>Description / Notes</label>
+                <textarea id="description" rows="3" placeholder="e.g., HTTP High Anonymity Proxies"></textarea>
+            </div>
+            
+            <div class="form-group">
+                <label>Single Proxy Link (Optional)</label>
+                <input type="text" id="proxy-url" placeholder="http://example.com">
+            </div>
+            
+            <div class="form-group">
+                <label>Bulk Proxy File (.txt list)</label>
+                <input type="file" id="proxy-file" accept=".txt">
+            </div>
+            
+            <div class="form-group">
+                <label>Schedule Release Time (Leave blank for instant live)</label>
+                <input type="datetime-local" id="schedule-time">
+            </div>
+            
+            <button type="submit">Submit Drop</button>
+        </form>
+    </div>
+
+    <!-- OWNER / ADMIN CONFIGURATION VIEW -->
+    <div id="admin-view" class="container hidden">
+        <div class="nav-links">
+            <a onclick="showView('dashboard-view')">&larr; Back to Dropper</a>
+            <a onclick="logout()">Logout</a>
+        </div>
+        
+        <h2>Admin Management Panel</h2>
+        <p>Configure and register new proxy link droppers here.</p>
+        <div id="admin-msg"></div>
+        
+        <form id="admin-form">
+            <div class="form-group">
+                <label>New Dropper Username</label>
+                <input type="text" id="new-username" required autocomplete="off">
+            </div>
+            <div class="form-group">
+                <label>Assign Temporary Password</label>
+                <input type="password" id="new-password" required>
+            </div>
+            <div class="form-group">
+                <label>System Role</label>
+                <select id="new-role" style="width: 100%; padding: 10px; background: #2d2d2d; color: #fff; border: 1px solid #444; border-radius: 4px;">
+                    <option value="dropper">Standard Link Dropper</option>
+                    <option value="admin">Full Administrator</option>
+                </select>
+            </div>
+            <button type="submit">Save & Provision User</button>
+        </form>
+    </div>
+
+    <script>
+        // basic client state helper
+        let currentUser = null;
+
+        function showView(viewId) {
+            document.getElementById('login-view').classList.add('hidden');
+            document.getElementById('dashboard-view').classList.add('hidden');
+            document.getElementById('admin-view').classList.add('hidden');
+            
+            document.getElementById(viewId).classList.remove('hidden');
+        }
+
+        function showMessage(elementId, text, isError = false) {
+            const el = document.getElementById(elementId);
+            el.className = `alert ${isError ? 'error' : 'success'}`;
+            el.innerText = text;
+        }
+
+        // Login Submission Logic
+        document.getElementById('login-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+
+            try {
+                const response = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    currentUser = data;
+                    
+                    // configure dashboard views based on permission rules
+                    document.getElementById('user-id-holder').value = data.userId;
+                    document.getElementById('user-badge').innerText = `Logged in as: ${username}`;
+                    
+                    if (data.role === 'admin') {
+                        document.getElementById('admin-link').classList.remove('hidden');
+                    } else {
+                        document.getElementById('admin-link').classList.add('hidden');
+                    }
+
+                    showView('dashboard-view');
+                } else {
+                    showMessage('login-msg', 'Invalid login credentials provided.', true);
+                }
+            } catch (err) {
+                showMessage('login-msg', 'Cannot connect to backend service setup.', true);
+            }
+        });
+
+        // Drop Link / File Submission Logic
+        document.getElementById('drop-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData();
+            
+            formData.append('userId', document.getElementById('user-id-holder').value);
+            formData.append('description', document.getElementById('description').value);
+            formData.append('url', document.getElementById('proxy-url').value);
+            
+            const fileInput = document.getElementById('proxy-file');
+            if (fileInput.files[0]) {
+                formData.append('proxy_file', fileInput.files[0]);
+            }
+
+            const rawTime = document.getElementById('schedule-time').value;
+            if (rawTime) {
+                // translate local view time to ISO string standard for backend storage
+                formData.append('scheduleTime', new Date(rawTime).toISOString());
+            }
+
+            try {
+                const response = await fetch('/api/drop-link', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (response.ok) {
+                    showMessage('drop-msg', 'Success! Proxies registered/scheduled smoothly.');
+                    document.getElementById('drop-form').reset();
+                } else {
+                    showMessage('drop-msg', 'Failed to record drop item.', true);
+                }
+            } catch (err) {
+                showMessage('drop-msg', 'Network layout transmission error.', true);
+            }
+        });
+
+        // Owner/Admin creation submission
+        document.getElementById('admin-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const username = document.getElementById('new-username').value;
+            const password = document.getElementById('new-password').value;
+            const role = document.getElementById('new-role').value;
+
+            try {const response = await fetch('/api/admin/create-user', {method: 'POST',headers: { 'Content-Type': 'application/json' },body: JSON.stringify({ username, password, role })});const data = await response.text();if (response.ok) {showMessage('admin-msg', Configured! Dropper account created successfully.);document.getElementById('admin-form').reset();} else {showMessage('admin-msg', Configuration failed: ${data}, true);}} catch (err) {showMessage('admin-msg', 'Admin routing configuration error.', true);}});function logout() {currentUser = null;document.getElementById('login-form').reset();document.getElementById('drop-form').reset();document.getElementById('admin-form').reset();showView('login-view');}

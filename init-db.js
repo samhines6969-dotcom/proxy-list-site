@@ -6,7 +6,7 @@ const db = new sqlite3.Database('./proxies.db');
 async function setupAdmin() {
     // CHANGE THESE TO WHATEVER YOU WANT
     const adminUsername = 'AdminUsernamefr'; 
-    const adminPassword = 'AdMInPaSwORd0awdfijfoapassaowfiafaf'; 
+    const adminPassword = 'AdminPassW0Rd14214418908103esfjeijfsefiosuefasadppppqaowdoaufoifusdufosudfauwofiueuosudifusdofusdfiuodifusdfousdf67444134sdfosfisdfsfdsfsf696969696996966967676767pesfisepofiaaaaacat'; 
 
     // hash the password so the server can read it safely
     const saltRounds = 10;
